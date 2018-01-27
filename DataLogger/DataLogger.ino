@@ -66,7 +66,7 @@ void logData() {
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.println(F("BMP280 test"));
+  Serial.println(F("Data logger"));
 
   // Initialise the altimeter
   if (!bme.begin()) {  
@@ -103,6 +103,7 @@ void setup() {
 
   // Write data header.
   writeHeader();
+  Serial.println("Writing header...");
 
   // Start on a multiple of the sample interval.
   logTime = micros()/(1000UL*SAMPLE_INTERVAL_MS) + 1;
@@ -115,6 +116,13 @@ void loop() {
   temperature = bme.readTemperature();
   pressure = bme.readPressure();
   altitude = bme.readAltitude(1020.5);
+  Serial.print("T: ");
+  Serial.print(temperature);
+  Serial.print(" *C, P: ");
+  Serial.print(pressure);
+  Serial.print(" Pa, A: ");
+  Serial.print(altitude);
+  Serial.println(" m.");
 
   // Wait for log time.
   int32_t diff;
@@ -127,6 +135,7 @@ void loop() {
     error("Missed data record");
   }
   
+  Serial.println("Logging data to SD");
   logData();
 
   // Force data to SD and update the directory entry to avoid data loss.
@@ -134,18 +143,4 @@ void loop() {
     error("write error");
   }
   
-//  Serial.print("Temperature = ");
-//  Serial.print(bme.readTemperature());
-//  Serial.println(" *C");
-//  
-//  Serial.print("Pressure = ");
-//  Serial.print(bme.readPressure());
-//  Serial.println(" Pa");
-//
-//  Serial.print("Approx altitude = ");
-//  Serial.print(bme.readAltitude(1013.25)); // this should be adjusted to your local forcase
-//  Serial.println(" m");
-//  
-//  Serial.println();
-//  delay(2000);
 }
