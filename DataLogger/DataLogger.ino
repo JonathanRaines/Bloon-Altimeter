@@ -65,6 +65,44 @@ void logData() {
   file.println();
 }
 
+void toggleLED() 
+{
+	if (LED_state)
+	{
+		digitalWrite(LED_BUILTIN, LOW);
+	}
+	else
+	{
+		digitalWrite(LED_BUILTIN, HIGH);
+	}
+	LED_state = !LED_state;
+}
+
+void missingSD() 
+{
+	while (true) 
+	{
+		toggleLED();
+		delay(75);
+	}
+}
+
+void noSensor()
+{
+	digitalWrite(LED_BUILTIN, HIGH);
+	while (true)
+	{
+		toggleLED();
+		delay(100);
+		toggleLED();
+		delay(100);
+		toggleLED();
+		delay(100);
+		toggleLED();
+		delay(1000);
+	}
+}
+
 // Error messages stored in flash.
 #define error(msg) sd.errorHalt(F(msg))
 
@@ -76,9 +114,15 @@ void setup() {
 #endif
 
   // Initialise the altimeter
-  if (!bme.begin()) {  
-    Serial.println("Could not find a valid BMP280 sensor, check wiring!");
-    while (1);
+  if (!bme.begin()) {
+#ifdef DEBUG
+	  Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+	  noSensor();
+	  while (1);
+#else
+	  noSensor();
+#endif // DEBUG
+
   }
 
   const uint8_t BASE_NAME_SIZE = sizeof(FILE_BASE_NAME) - 1;
@@ -87,7 +131,11 @@ void setup() {
   // Initialize at the highest speed supported by the board that is
   // not over 50 MHz. Try a lower speed if SPI errors occur.
   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
-    sd.initErrorHalt();
+	#ifdef DEBUG
+//	  sd.initErrorHalt();
+	#else
+	  missingSD();
+	#endif // DEBUG
   }
 
   // Find an unused file name.
@@ -124,15 +172,7 @@ void setup() {
 
 void loop() {
 	
-	if (LED_state)
-	{
-		digitalWrite(LED_BUILTIN, LOW);
-	}
-	else 
-	{
-		digitalWrite(LED_BUILTIN, HIGH);
-	}
-	LED_state = !LED_state;
+	toggleLED();
 
   // Time for next record.
   logTime += 1000UL*SAMPLE_INTERVAL_MS;
