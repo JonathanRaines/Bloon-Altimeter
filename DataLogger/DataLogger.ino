@@ -15,6 +15,11 @@
 #define SD_MOSI 3
 #define SD_CS 5
 
+bool LED_state = false;
+
+// Comment if not debugging
+#define DEBUG
+
 // Create altimeter object
 Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
@@ -64,9 +69,11 @@ void logData() {
 #define error(msg) sd.errorHalt(F(msg))
 
 void setup() {
-  // put your setup code here, to run once:
+
+#ifdef DEBUG
   Serial.begin(9600);
   Serial.println(F("Data logger"));
+#endif
 
   // Initialise the altimeter
   if (!bme.begin()) {  
@@ -109,9 +116,24 @@ void setup() {
   logTime = micros()/(1000UL*SAMPLE_INTERVAL_MS) + 1;
   logTime *= 1000UL*SAMPLE_INTERVAL_MS;
   
+
+  // Configure the onboard LED
+  pinMode(LED_BUILTIN, OUTPUT);
+
 }
 
 void loop() {
+	
+	if (LED_state)
+	{
+		digitalWrite(LED_BUILTIN, LOW);
+	}
+	else 
+	{
+		digitalWrite(LED_BUILTIN, HIGH);
+	}
+	LED_state = !LED_state;
+
   // Time for next record.
   logTime += 1000UL*SAMPLE_INTERVAL_MS;
 
