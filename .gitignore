@@ -34,3 +34,6 @@
 *.vcxproj
 *.filters
 *.vsarduino.h
+*.hex
+*.elf
+*.buildinfo
