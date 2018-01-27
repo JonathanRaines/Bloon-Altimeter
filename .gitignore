@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+*.xml
+*.vcxproj
+*.filters
+*.vsarduino.h
