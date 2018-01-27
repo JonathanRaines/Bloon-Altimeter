@@ -112,6 +112,8 @@ void setup() {
 }
 
 void loop() {
+  // Time for next record.
+  logTime += 1000UL*SAMPLE_INTERVAL_MS;
 
   temperature = bme.readTemperature();
   pressure = bme.readPressure();
@@ -144,3 +146,4 @@ void loop() {
   }
   
 }
+
