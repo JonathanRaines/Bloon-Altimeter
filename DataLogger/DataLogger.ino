@@ -16,6 +16,7 @@
 #define SD_CS 5
 
 bool LED_state = false;
+int LED_pulseLength = 100; //milliseconds. 
 
 // Comment if not debugging
 #define DEBUG
@@ -78,29 +79,31 @@ void toggleLED()
 	LED_state = !LED_state;
 }
 
+// Will run forever - only used for error states. 
+void errorLED(int num_pulse) 
+{
+	digitalWrite(LED_BUILTIN, LOW);
+	while (1) 
+	{
+		for (int i = 0; i < num_pulse; i++)
+		{
+			toggleLED();
+			delay(LED_pulseLength);
+			toggleLED();
+			delay(LED_pulseLength);
+		}
+		delay(LED_pulseLength * 5); // Long off between pulses.
+	}
+}
+
 void missingSD() 
 {
-	while (true) 
-	{
-		toggleLED();
-		delay(75);
-	}
+	errorLED(2); // No one-pulse error to avoid any possible confusion with heartbeat.
 }
 
 void noSensor()
 {
-	digitalWrite(LED_BUILTIN, HIGH);
-	while (true)
-	{
-		toggleLED();
-		delay(100);
-		toggleLED();
-		delay(100);
-		toggleLED();
-		delay(100);
-		toggleLED();
-		delay(1000);
-	}
+	errorLED(3);
 }
 
 // Error messages stored in flash.
@@ -117,7 +120,6 @@ void setup() {
   if (!bme.begin()) {
 #ifdef DEBUG
 	  Serial.println("Could not find a valid BMP280 sensor, check wiring!");
-	  noSensor();
 	  while (1);
 #else
 	  noSensor();
@@ -132,7 +134,7 @@ void setup() {
   // not over 50 MHz. Try a lower speed if SPI errors occur.
   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
 	#ifdef DEBUG
-//	  sd.initErrorHalt();
+	  sd.initErrorHalt();
 	#else
 	  missingSD();
 	#endif // DEBUG
