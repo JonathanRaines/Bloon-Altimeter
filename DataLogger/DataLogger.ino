@@ -15,8 +15,11 @@
 #define SD_MOSI 3
 #define SD_CS 5
 
+// LED varialbles
 bool LED_state = false;
 int LED_pulseLength = 100; //milliseconds. 
+#define NUM_PULSE_MISSING_SD 2 // No one-pulse error to avoid any possible confusion with heartbeat.
+#define NUM_PULSE_NO_SENSOR 3
 
 // Comment if not debugging
 #define DEBUG
@@ -24,7 +27,11 @@ int LED_pulseLength = 100; //milliseconds.
 // Create altimeter object
 Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
-uint32_t temperature;
+#define SEA_LEVEL_PRESSURE_FILENAME "Sea_Level_Pressure.txt"
+SdFile slp_file;
+float sea_level_barometric_pressure;
+
+float temperature;
 uint32_t pressure;
 uint32_t altitude;
 
@@ -47,8 +54,11 @@ const uint32_t SAMPLE_INTERVAL_MS = 1000;
 
 // Write data header.
 void writeHeader() {
-  file.print(F("Time (ms), Temperature, Pressure, Altitude"));
-  file.println();
+	file.print(F("Altitude calculated assuming sea level pressure of "));
+	file.print(sea_level_barometric_pressure);
+	file.println(F(" hPa"));
+	file.print(F("Time (ms), Temperature, Pressure, Altitude"));
+	file.println();
 }
 
 // Log a data record.
@@ -56,7 +66,7 @@ void logData() {
   // Write data to file.  Start with log time in micros.
   file.print(logTime);
 
-  // Write ADC data to CSV record.
+  // Write data to CSV record.
   file.print(',');
   file.print(temperature);
   file.print(',');
@@ -96,49 +106,78 @@ void errorLED(int num_pulse)
 	}
 }
 
-void missingSD() 
-{
-	errorLED(2); // No one-pulse error to avoid any possible confusion with heartbeat.
-}
-
-void noSensor()
-{
-	errorLED(3);
-}
-
 // Error messages stored in flash.
 #define error(msg) sd.errorHalt(F(msg))
 
 void setup() {
 
 #ifdef DEBUG
-  Serial.begin(9600);
-  Serial.println(F("Data logger"));
+	Serial.begin(9600);
+	Serial.println(F("Data logger"));
 #endif
 
-  // Initialise the altimeter
-  if (!bme.begin()) {
+	// Initialise the altimeter
+	if (!bme.begin()) {
 #ifdef DEBUG
-	  Serial.println("Could not find a valid BMP280 sensor, check wiring!");
-	  while (1);
+		Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+		while (1);
 #else
-	  noSensor();
+		errorLED(NUM_PULSE_NO_SENSOR);
 #endif // DEBUG
 
-  }
+	}
 
-  const uint8_t BASE_NAME_SIZE = sizeof(FILE_BASE_NAME) - 1;
-  char fileName[13] = FILE_BASE_NAME "00.csv"; 
-  
-  // Initialize at the highest speed supported by the board that is
-  // not over 50 MHz. Try a lower speed if SPI errors occur.
-  if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
-	#ifdef DEBUG
-	  sd.initErrorHalt();
-	#else
-	  missingSD();
-	#endif // DEBUG
-  }
+	const uint8_t BASE_NAME_SIZE = sizeof(FILE_BASE_NAME) - 1;
+	char fileName[13] = FILE_BASE_NAME "00.csv";
+
+	// Initialize at the highest speed supported by the board that is
+	// not over 50 MHz. Try a lower speed if SPI errors occur.
+	if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
+#ifdef DEBUG
+		sd.initErrorHalt();
+#else
+		errorLED(NUM_PULSE_MISSING_SD);
+#endif // DEBUG
+	}
+
+	// Read in sea level barometric pressur
+	if (sd.exists(SEA_LEVEL_PRESSURE_FILENAME)) 
+	{
+		Serial.println("Found it");
+		if (!slp_file.open(SEA_LEVEL_PRESSURE_FILENAME, O_READ)) {
+			//error messages
+		}
+		sea_level_barometric_pressure = 0;
+		bool decimal = false;
+		int decimal_place = 1;
+		while (slp_file.available()) 
+		{
+			char snippet = (char)slp_file.read();
+			int snippet_int = (int)snippet - 48; //Convert from ascii (48 => 0)
+			if (snippet == 46) { // Check if it's a decimal point
+				decimal = true;	
+			}
+			if(snippet_int >= 0 && snippet_int <= 9){ // If it's a number
+				if (!decimal) { // Before decimal point
+					sea_level_barometric_pressure = sea_level_barometric_pressure * 10 + snippet_int; // Append the snippet to the number
+				}
+				else { // After decimal point
+					sea_level_barometric_pressure += (float)snippet_int / (10 ^ decimal_place);
+					decimal_place++;
+				}
+		
+			}
+		}
+		Serial.print("Sea level pressure: ");
+		Serial.print(sea_level_barometric_pressure);
+		Serial.println(" hPa");
+
+		slp_file.close();
+	}else 
+	{	
+		Serial.println("Can't find it");
+		sea_level_barometric_pressure = 1000; //hPA Assume the average if better data isn't available. 
+	}
 
   // Find an unused file name.
   if (BASE_NAME_SIZE > 6) {
@@ -181,7 +220,7 @@ void loop() {
 
   temperature = bme.readTemperature();
   pressure = bme.readPressure();
-  altitude = bme.readAltitude(1020.5);
+  altitude = bme.readAltitude(sea_level_barometric_pressure);
   Serial.print("T: ");
   Serial.print(temperature);
   Serial.print(" *C, P: ");
